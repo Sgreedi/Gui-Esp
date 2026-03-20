@@ -4,263 +4,203 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
+-- STATES
+local chamsEnabled = false
+local outlineEnabled = false
+local healthEnabled = false
+local teamCheck = false
+local guiVisible = true
+
+local espCache = {}
+local healthCache = {}
+
 -- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "SimpleGUI"
-gui.Parent = player:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.ResetOnSpawn = false
 
--- MAIN FRAME
-local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 260, 0, 260)
-main.Position = UDim2.new(0.5, -130, 0.5, -130)
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0,300,0,300)
+main.Position = UDim2.new(0.5,-150,0.5,-150)
 main.BackgroundColor3 = Color3.fromRGB(20,20,20)
-main.BorderSizePixel = 0
-main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,12)
 
-Instance.new("UICorner", main).CornerRadius = UDim.new(0,10)
-
--- TOP BAR
-local top = Instance.new("Frame")
-top.Size = UDim2.new(1,0,0,30)
+local top = Instance.new("Frame", main)
+top.Size = UDim2.new(1,0,0,35)
 top.BackgroundColor3 = Color3.fromRGB(30,30,30)
-top.BorderSizePixel = 0
-top.Parent = main
+Instance.new("UICorner", top).CornerRadius = UDim.new(0,12)
 
-Instance.new("UICorner", top).CornerRadius = UDim.new(0,10)
-
--- TITLE
-local title = Instance.new("TextLabel")
-title.Text = "ScriptWar2e"
+local title = Instance.new("TextLabel", top)
 title.Size = UDim2.new(1,0,1,0)
 title.BackgroundTransparency = 1
-title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Text = "ScriptWar2e"
+title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
-title.Parent = top
-
--- DRAGGING
-local dragging = false
-local startPos, startFramePos
-
-top.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		startPos = input.Position
-		startFramePos = main.Position
-	end
-end)
-
-top.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-	end
-end)
-
-UIS.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - startPos
-		main.Position = UDim2.new(
-			startFramePos.X.Scale,
-			startFramePos.X.Offset + delta.X,
-			startFramePos.Y.Scale,
-			startFramePos.Y.Offset + delta.Y
-		)
-	end
-end)
-
--- TOGGLE GUI WITH K
-local visible = true
-UIS.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.K then
-		visible = not visible
-		main.Visible = visible
-	end
-end)
 
 -- BUTTON CREATOR
-local function createButton(text, y)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0.9,0,0,30)
-	btn.Position = UDim2.new(0.05,0,0,y)
-	btn.Text = text .. ": OFF"
-	btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	btn.TextColor3 = Color3.fromRGB(255,255,255)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 14
-	btn.Parent = main
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
-	return btn
+local function btn(text, y)
+	local b = Instance.new("TextButton", main)
+	b.Size = UDim2.new(1,-20,0,40)
+	b.Position = UDim2.new(0,10,0,y)
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.Text = text
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.Gotham
+	b.TextSize = 14
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
+	return b
 end
 
--- BUTTONS
-local outlineBtn = createButton("Outline ESP", 40)
-local chamsBtn = createButton("Chams ESP", 75)
-local nameBtn = createButton("Name ESP", 110)
-local headDotBtn = createButton("Head Dot", 145)
-local healthBtn = createButton("Health Bar", 180)
+local chamsBtn = btn("Chams ESP: OFF", 50)
+local outlineBtn = btn("Outline ESP: OFF", 100)
+local healthBtn = btn("Health Bar: OFF", 150)
+local teamBtn = btn("Apply Team Check", 200)
 
--- STATES
-local outlineOn = false
-local chamsOn = false
-local nameOn = false
-local headDotOn = false
-local healthOn = false
+-- DRAG
+local dragging, dragInput, mousePos, framePos = false
+top.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		mousePos = i.Position
+		framePos = main.Position
+		i.Changed:Connect(function()
+			if i.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
 
--- ESP LOOP
+top.InputChanged:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseMovement then dragInput = i end
+end)
+
+UIS.InputChanged:Connect(function(i)
+	if i == dragInput and dragging then
+		local delta = i.Position - mousePos
+		main.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+	end
+end)
+
+-- KEYBIND (K TO TOGGLE GUI)
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.K then
+		guiVisible = not guiVisible
+		main.Visible = guiVisible
+	end
+end)
+
+-- TEAM CHECK
+local function isEnemy(p)
+	if not teamCheck then return true end
+	return p.Team ~= player.Team
+end
+
+-- ESP CREATE
+local function getHighlight(char)
+	if not espCache[char] then
+		local hl = Instance.new("Highlight")
+		hl.Name = "ESP"
+		hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		hl.Parent = char
+		espCache[char] = hl
+	end
+	return espCache[char]
+end
+
+-- HEALTH BAR CREATE (SMALLER)
+local function getHealth(plr)
+	if not healthCache[plr] then
+		local bill = Instance.new("BillboardGui")
+		bill.Size = UDim2.new(0,4,0,35) -- smaller
+		bill.AlwaysOnTop = true
+
+		local bg = Instance.new("Frame", bill)
+		bg.Size = UDim2.new(1,0,1,0)
+		bg.BackgroundColor3 = Color3.fromRGB(30,30,30)
+		Instance.new("UICorner", bg).CornerRadius = UDim.new(1,0)
+
+		local bar = Instance.new("Frame", bg)
+		bar.Size = UDim2.new(1,0,1,0)
+		Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
+
+		healthCache[plr] = {gui = bill, bar = bar}
+	end
+	return healthCache[plr]
+end
+
+-- UPDATE LOOP (NO FLICKER)
 RunService.RenderStepped:Connect(function()
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character then
-			local char = plr.Character
-			local humanoid = char:FindFirstChildOfClass("Humanoid")
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= player and p.Character and isEnemy(p) then
+			local char = p.Character
 
-			-- HIGHLIGHT
-			local hl = char:FindFirstChild("Highlight")
-			if outlineOn or chamsOn then
-				if not hl then
-					hl = Instance.new("Highlight")
-					hl.Name = "Highlight"
-					hl.Parent = char
-				end
+			-- ESP
+			if chamsEnabled or outlineEnabled then
+				local hl = getHighlight(char)
 
-				hl.FillColor = Color3.fromRGB(0,255,255)
-				hl.OutlineColor = Color3.fromRGB(0,255,255)
-
-				if chamsOn then
+				if chamsEnabled then
+					hl.FillColor = Color3.fromRGB(255,0,0)
 					hl.FillTransparency = 0.5
+					hl.OutlineColor = Color3.fromRGB(255,255,255)
 					hl.OutlineTransparency = 0
-				else
+				elseif outlineEnabled then
 					hl.FillTransparency = 1
-					hl.OutlineTransparency = outlineOn and 0 or 1
+					hl.OutlineColor = Color3.fromRGB(255,0,0)
+					hl.OutlineTransparency = 0
 				end
 			else
-				if hl then hl:Destroy() end
+				if espCache[char] then
+					espCache[char]:Destroy()
+					espCache[char] = nil
+				end
 			end
 
-			-- HEAD
-			local head = char:FindFirstChild("Head")
-			if head then
+			-- HEALTH BAR (LEFT, SMALL)
+			if healthEnabled then
+				local hum = char:FindFirstChild("Humanoid")
+				local root = char:FindFirstChild("HumanoidRootPart")
+				if hum and root then
+					local data = getHealth(p)
+					data.gui.Parent = root
+					data.gui.StudsOffset = Vector3.new(-2, 1.4, 0)
 
-				-- NAME ESP (FIXED)
-				local tag = head:FindFirstChild("NameESP")
-				if nameOn then
-					if not tag then
-						tag = Instance.new("BillboardGui")
-						tag.Name = "NameESP"
-						tag.Size = UDim2.new(0,70,0,14)
-						tag.StudsOffset = Vector3.new(0,2.2,0)
-						tag.AlwaysOnTop = true
-						tag.Parent = head
+					local hp = hum.Health / hum.MaxHealth
+					data.bar.Size = UDim2.new(1,0,hp,0)
 
-						local txt = Instance.new("TextLabel")
-						txt.Size = UDim2.new(1,0,1,0)
-						txt.BackgroundTransparency = 1
-						txt.TextColor3 = Color3.fromRGB(0,255,255)
-						txt.Font = Enum.Font.GothamBold
-						txt.TextScaled = true
-						txt.Text = plr.Name
-						txt.Parent = tag
-					end
-				else
-					if tag then tag:Destroy() end
-				end
-
-				-- HEAD DOT
-				local dot = head:FindFirstChild("HeadDot")
-				if headDotOn then
-					if not dot then
-						dot = Instance.new("BillboardGui")
-						dot.Name = "HeadDot"
-						dot.Size = UDim2.new(0,8,0,8)
-						dot.StudsOffset = Vector3.new(0,0,0)
-						dot.AlwaysOnTop = true
-						dot.Parent = head
-
-						local circle = Instance.new("Frame")
-						circle.Size = UDim2.new(1,0,1,0)
-						circle.BackgroundColor3 = Color3.fromRGB(255,255,255)
-						circle.BorderSizePixel = 0
-						circle.Parent = dot
-
-						local corner = Instance.new("UICorner", circle)
-						corner.CornerRadius = UDim.new(1,0)
-					end
-				else
-					if dot then dot:Destroy() end
-				end
-
-				-- HEALTH BAR (SMALLER)
-				local bar = head:FindFirstChild("HealthBar")
-				if healthOn and humanoid then
-					if not bar then
-						bar = Instance.new("BillboardGui")
-						bar.Name = "HealthBar"
-						bar.Size = UDim2.new(0,4,0,30) -- smaller
-						bar.StudsOffset = Vector3.new(-2.2,-0.5,0)
-						bar.AlwaysOnTop = true
-						bar.MaxDistance = math.huge
-						bar.Parent = head
-
-						local bg = Instance.new("Frame")
-						bg.Size = UDim2.new(1,0,1,0)
-						bg.BackgroundColor3 = Color3.fromRGB(30,30,30)
-						bg.BorderSizePixel = 0
-						bg.Parent = bar
-						Instance.new("UICorner", bg).CornerRadius = UDim.new(1,0)
-
-						local fill = Instance.new("Frame")
-						fill.Name = "Fill"
-						fill.AnchorPoint = Vector2.new(0,1)
-						fill.Position = UDim2.new(0,0,1,0)
-						fill.Size = UDim2.new(1,0,1,0)
-						fill.BorderSizePixel = 0
-						fill.Parent = bg
-						Instance.new("UICorner", fill).CornerRadius = UDim.new(1,0)
-					end
-
-					local fill = bar:FindFirstChild("Frame"):FindFirstChild("Fill")
-					local healthPercent = humanoid.Health / humanoid.MaxHealth
-
-					fill.Size = UDim2.new(1,0,healthPercent,0)
-
-					if humanoid.Health > 70 then
-						fill.BackgroundColor3 = Color3.fromRGB(0,255,0)
-					elseif humanoid.Health > 30 then
-						fill.BackgroundColor3 = Color3.fromRGB(255,255,0)
+					if hum.Health > 70 then
+						data.bar.BackgroundColor3 = Color3.fromRGB(0,255,0)
+					elseif hum.Health > 30 then
+						data.bar.BackgroundColor3 = Color3.fromRGB(255,255,0)
 					else
-						fill.BackgroundColor3 = Color3.fromRGB(255,0,0)
+						data.bar.BackgroundColor3 = Color3.fromRGB(255,0,0)
 					end
-				else
-					if bar then bar:Destroy() end
+				end
+			else
+				if healthCache[p] then
+					healthCache[p].gui:Destroy()
+					healthCache[p] = nil
 				end
 			end
 		end
 	end
 end)
 
--- BUTTON EVENTS
-outlineBtn.MouseButton1Click:Connect(function()
-	outlineOn = not outlineOn
-	outlineBtn.Text = "Outline ESP: " .. (outlineOn and "ON" or "OFF")
-end)
-
+-- BUTTONS
 chamsBtn.MouseButton1Click:Connect(function()
-	chamsOn = not chamsOn
-	chamsBtn.Text = "Chams ESP: " .. (chamsOn and "ON" or "OFF")
+	chamsEnabled = not chamsEnabled
+	chamsBtn.Text = "Chams ESP: " .. (chamsEnabled and "ON" or "OFF")
 end)
 
-nameBtn.MouseButton1Click:Connect(function()
-	nameOn = not nameOn
-	nameBtn.Text = "Name ESP: " .. (nameOn and "ON" or "OFF")
-end)
-
-headDotBtn.MouseButton1Click:Connect(function()
-	headDotOn = not headDotOn
-	headDotBtn.Text = "Head Dot: " .. (headDotOn and "ON" or "OFF")
+outlineBtn.MouseButton1Click:Connect(function()
+	outlineEnabled = not outlineEnabled
+	outlineBtn.Text = "Outline ESP: " .. (outlineEnabled and "ON" or "OFF")
 end)
 
 healthBtn.MouseButton1Click:Connect(function()
-	healthOn = not healthOn
-	healthBtn.Text = "Health Bar: " .. (healthOn and "ON" or "OFF")
+	healthEnabled = not healthEnabled
+	healthBtn.Text = "Health Bar: " .. (healthEnabled and "ON" or "OFF")
+end)
+
+teamBtn.MouseButton1Click:Connect(function()
+	teamCheck = true
 end)
